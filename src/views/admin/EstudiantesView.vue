@@ -264,7 +264,7 @@ const paginas = () => Math.max(1, Math.ceil(total.value / TAM))
         <code class="text-xs">TIPO DE DOCUMENTO</code>,
         <code class="text-xs">NUMERO DE DOCUMENTO</code>,
         <code class="text-xs">fecha de entrega del certificado</code>.
-        <a href="/plantilla-estudiantes.csv" class="text-primary-500 underline" download>Descargar plantilla</a>
+        <a href="/plantilla-estudiantes.xlsx" class="text-primary-500 underline" download>Descargar plantilla Excel</a>
       </p>
       <p class="text-xs text-slate-500 mb-3">
         Las instituciones se crean o actualizan automáticamente. El contratista debe estar

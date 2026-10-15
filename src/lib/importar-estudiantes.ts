@@ -235,9 +235,31 @@ export function agruparInstituciones(filas: FilaEstudiante[]): {
   return { instituciones: [...mapa.values()], errores }
 }
 
+/** .xlsx (zip: "PK") o .xls antiguo (OLE2). Lo demás se trata como CSV de texto. */
+function esLibroExcel(buffer: ArrayBuffer): boolean {
+  const b = new Uint8Array(buffer.slice(0, 4))
+  const zip = b[0] === 0x50 && b[1] === 0x4b
+  const ole = b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0
+  return zip || ole
+}
+
+/**
+ * CSV guardado desde Excel en español: puede venir en UTF-8 (con o sin BOM)
+ * o en Windows-1252 («CSV delimitado por comas/punto y coma»). Así no se dañan las tildes.
+ */
+function decodificarTexto(buffer: ArrayBuffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buffer).replace(/^\uFEFF/, '')
+  } catch {
+    return new TextDecoder('windows-1252').decode(buffer)
+  }
+}
+
 export async function parsearArchivoEstudiantes(buffer: ArrayBuffer): Promise<ResultadoImportacion> {
   const XLSX = await import('xlsx')
-  const wb = XLSX.read(buffer, { type: 'array' })
+  const wb = esLibroExcel(buffer)
+    ? XLSX.read(buffer, { type: 'array' })
+    : XLSX.read(decodificarTexto(buffer), { type: 'string' })
   const hoja = wb.Sheets[wb.SheetNames[0]]
   if (!hoja) {
     return { validas: [], errores: [{ fila: 1, mensaje: 'El archivo no contiene hojas' }] }
