@@ -11,6 +11,7 @@ export interface Institucion {
   municipio: string
   fecha_expedicion: string // ISO date: "YYYY-MM-DD"
   activa: boolean
+  contratista_id: string | null
   creado_en: string
 }
 
@@ -19,13 +20,10 @@ export interface Firmante {
   nombre: string
   cargo: string
   firma_path: string
+  /** true = aparece en todos los certificados (puestos 1 y 2) */
+  es_fijo: boolean
+  orden_fijo: 1 | 2 | null
   creado_en: string
-}
-
-export interface InstitucionFirmante {
-  institucion_id: string
-  firmante_id: string
-  orden: 1 | 2 | 3
 }
 
 export interface Estudiante {
@@ -59,13 +57,13 @@ export interface Database {
       }
       firmantes: {
         Row: Firmante
-        Insert: Omit<Firmante, 'id' | 'creado_en'> & { id?: string; creado_en?: string }
+        Insert: Omit<Firmante, 'id' | 'creado_en' | 'es_fijo' | 'orden_fijo'> & {
+          id?: string
+          es_fijo?: boolean
+          orden_fijo?: 1 | 2 | null
+          creado_en?: string
+        }
         Update: Partial<Omit<Firmante, 'id'>>
-      }
-      institucion_firmantes: {
-        Row: InstitucionFirmante
-        Insert: InstitucionFirmante
-        Update: Partial<InstitucionFirmante>
       }
       estudiantes: {
         Row: Estudiante

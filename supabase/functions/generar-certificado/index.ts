@@ -86,15 +86,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(404, MSG_NO_ENCONTRADO)
     }
 
-    // 8. Obtener institución con sus firmantes ordenados
+    // 8. Obtener institución (con su contratista) y los 2 firmantes fijos
     const { data: institucion, error: errInst } = await supabase
       .from("instituciones")
       .select(`
         id, nombre, municipio, fecha_expedicion,
-        institucion_firmantes (
-          orden,
-          firmantes ( id, nombre, cargo, firma_path )
-        )
+        contratista:firmantes!contratista_id ( id, nombre, cargo, firma_path )
       `)
       .eq("id", institucion_id)
       .eq("activa", true)
@@ -105,11 +102,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(404, MSG_NO_ENCONTRADO)
     }
 
-    // Ordenar firmantes por campo 'orden' (1, 2, 3)
-    const firmantes = ((institucion.institucion_firmantes as any[]) ?? [])
-      .sort((a, b) => a.orden - b.orden)
-      .map((r) => r.firmantes)
-      .filter(Boolean)
+    // Firmantes fijos (puestos 1 y 2): iguales en todos los certificados
+    const { data: fijos, error: errFijos } = await supabase
+      .from("firmantes")
+      .select("id, nombre, cargo, firma_path")
+      .eq("es_fijo", true)
+      .order("orden_fijo")
+
+    if (errFijos) {
+      console.error("Error al obtener firmantes fijos:", errFijos)
+      await registrarIntento(supabase, ipHash, false)
+      return jsonError(500, "Ocurrió un error. Intenta nuevamente más tarde.")
+    }
+
+    // Orden de firma: fijo 1, fijo 2, contratista de la institución (derecha)
+    const firmantes = [...(fijos ?? []), institucion.contratista as any].filter(Boolean)
 
     // 9. Descargar imágenes de firma desde Storage (privado)
     const firmasImagenes = await descargarFirmas(supabase, firmantes)

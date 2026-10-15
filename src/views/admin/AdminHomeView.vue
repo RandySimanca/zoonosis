@@ -50,7 +50,7 @@ onMounted(async () => {
       </div>
     </div>
     <p class="text-sm text-slate-500 mt-8 max-w-2xl">
-      Carga instituciones y firmantes, asígnales el orden de firma y luego importa estudiantes por
+      Carga instituciones y firmantes, marca los 2 firmantes fijos, asigna el contratista de cada institución y luego importa estudiantes por
       Excel o CSV. El público descarga el PDF desde la página de inicio.
     </p>
   </div>

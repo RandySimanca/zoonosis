@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import type { Firmante, Institucion } from '@/types/database'
 
 const lista = ref<Institucion[]>([])
 const firmantes = ref<Firmante[]>([])
-const asignaciones = ref<Record<string, { 1?: string; 2?: string; 3?: string }>>({})
+const contratistas = computed(() => firmantes.value.filter((f) => !f.es_fijo))
+const fijos = computed(() =>
+  firmantes.value.filter((f) => f.es_fijo).sort((a, b) => (a.orden_fijo ?? 0) - (b.orden_fijo ?? 0)),
+)
+
+function nombreContratista(id: string | null): string {
+  return firmantes.value.find((f) => f.id === id)?.nombre ?? '— Sin asignar —'
+}
 const error = ref('')
 const ok = ref('')
 const modal = ref(false)
@@ -17,30 +24,21 @@ const form = reactive({
   municipio: '',
   fecha_expedicion: '',
   activa: true,
-  firmante1: '',
-  firmante2: '',
-  firmante3: '',
+  contratista_id: '',
 })
 
 async function cargar(): Promise<void> {
   error.value = ''
-  const [i, f, a] = await Promise.all([
+  const [i, f] = await Promise.all([
     supabase.from('instituciones').select('*').order('nombre'),
     supabase.from('firmantes').select('*').order('nombre'),
-    supabase.from('institucion_firmantes').select('*'),
   ])
-  if (i.error || f.error || a.error) {
+  if (i.error || f.error) {
     error.value = 'No se pudieron cargar las instituciones.'
     return
   }
   lista.value = i.data ?? []
   firmantes.value = f.data ?? []
-  const map: Record<string, { 1?: string; 2?: string; 3?: string }> = {}
-  for (const row of a.data ?? []) {
-    if (!map[row.institucion_id]) map[row.institucion_id] = {}
-    map[row.institucion_id][row.orden] = row.firmante_id
-  }
-  asignaciones.value = map
 }
 
 onMounted(cargar)
@@ -51,9 +49,7 @@ function abrirNueva(): void {
   form.municipio = ''
   form.fecha_expedicion = ''
   form.activa = true
-  form.firmante1 = ''
-  form.firmante2 = ''
-  form.firmante3 = ''
+  form.contratista_id = ''
   modal.value = true
 }
 
@@ -63,21 +59,13 @@ function abrirEditar(inst: Institucion): void {
   form.municipio = inst.municipio
   form.fecha_expedicion = inst.fecha_expedicion
   form.activa = inst.activa
-  const as = asignaciones.value[inst.id] ?? {}
-  form.firmante1 = as[1] ?? ''
-  form.firmante2 = as[2] ?? ''
-  form.firmante3 = as[3] ?? ''
+  form.contratista_id = inst.contratista_id ?? ''
   modal.value = true
 }
 
 async function guardar(): Promise<void> {
   error.value = ''
   ok.value = ''
-  const ids = [form.firmante1, form.firmante2, form.firmante3].filter(Boolean)
-  if (new Set(ids).size !== ids.length) {
-    error.value = 'Cada firmante solo puede ocupar un puesto.'
-    return
-  }
   guardando.value = true
   try {
     const payload = {
@@ -85,6 +73,7 @@ async function guardar(): Promise<void> {
       municipio: form.municipio.trim(),
       fecha_expedicion: form.fecha_expedicion,
       activa: form.activa,
+      contratista_id: form.contratista_id || null,
     }
     let institucionId = editandoId.value
     if (institucionId) {
@@ -96,16 +85,6 @@ async function guardar(): Promise<void> {
       institucionId = data.id
     }
 
-    await supabase.from('institucion_firmantes').delete().eq('institucion_id', institucionId)
-    const filas = [
-      form.firmante1 ? { institucion_id: institucionId, firmante_id: form.firmante1, orden: 1 as const } : null,
-      form.firmante2 ? { institucion_id: institucionId, firmante_id: form.firmante2, orden: 2 as const } : null,
-      form.firmante3 ? { institucion_id: institucionId, firmante_id: form.firmante3, orden: 3 as const } : null,
-    ].filter((x): x is NonNullable<typeof x> => x !== null)
-    if (filas.length) {
-      const { error: e2 } = await supabase.from('institucion_firmantes').insert(filas)
-      if (e2) throw e2
-    }
     modal.value = false
     ok.value = 'Institución guardada.'
     await cargar()
@@ -146,6 +125,7 @@ async function eliminar(inst: Institucion): Promise<void> {
             <th class="px-4 py-3">Nombre</th>
             <th class="px-4 py-3">Municipio</th>
             <th class="px-4 py-3">Expedición</th>
+            <th class="px-4 py-3">Contratista</th>
             <th class="px-4 py-3">Estado</th>
             <th class="px-4 py-3" />
           </tr>
@@ -155,6 +135,7 @@ async function eliminar(inst: Institucion): Promise<void> {
             <td class="px-4 py-3 font-medium">{{ i.nombre }}</td>
             <td class="px-4 py-3">{{ i.municipio }}</td>
             <td class="px-4 py-3">{{ i.fecha_expedicion }}</td>
+            <td class="px-4 py-3">{{ nombreContratista(i.contratista_id) }}</td>
             <td class="px-4 py-3">{{ i.activa ? 'Activa' : 'Inactiva' }}</td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
               <button type="button" class="text-primary-500 underline mr-3" @click="abrirEditar(i)">Editar</button>
@@ -162,7 +143,7 @@ async function eliminar(inst: Institucion): Promise<void> {
             </td>
           </tr>
           <tr v-if="!lista.length">
-            <td colspan="5" class="px-4 py-8 text-center text-slate-400">No hay instituciones.</td>
+            <td colspan="6" class="px-4 py-8 text-center text-slate-400">No hay instituciones.</td>
           </tr>
         </tbody>
       </table>
@@ -187,19 +168,16 @@ async function eliminar(inst: Institucion): Promise<void> {
           <input v-model="form.activa" type="checkbox" />
           Visible en el formulario público
         </label>
-        <p class="text-sm font-medium text-slate-700 pt-2">Firmantes (izquierda, centro, derecha)</p>
-        <select v-model="form.firmante1" class="input-field">
-          <option value="">— Puesto 1 —</option>
-          <option v-for="f in firmantes" :key="f.id" :value="f.id">{{ f.nombre }}</option>
+        <p class="text-sm font-medium text-slate-700 pt-2">Contratista (firma a la derecha)</p>
+        <select v-model="form.contratista_id" class="input-field" required>
+          <option value="">— Selecciona el contratista —</option>
+          <option v-for="f in contratistas" :key="f.id" :value="f.id">{{ f.nombre }}</option>
         </select>
-        <select v-model="form.firmante2" class="input-field">
-          <option value="">— Puesto 2 —</option>
-          <option v-for="f in firmantes" :key="f.id" :value="f.id">{{ f.nombre }}</option>
-        </select>
-        <select v-model="form.firmante3" class="input-field">
-          <option value="">— Puesto 3 —</option>
-          <option v-for="f in firmantes" :key="f.id" :value="f.id">{{ f.nombre }}</option>
-        </select>
+        <p class="text-xs text-slate-500">
+          Firmantes fijos (en todos los certificados):
+          <span v-if="fijos.length">{{ fijos.map((f) => f.nombre).join(' · ') }}</span>
+          <span v-else class="text-red-600">aún no hay; márcalos en la sección Firmantes.</span>
+        </p>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" class="btn-secondary" @click="modal = false">Cancelar</button>
           <button type="submit" class="btn-primary" :disabled="guardando">
