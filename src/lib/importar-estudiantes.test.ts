@@ -1,39 +1,95 @@
 import { describe, expect, it } from 'vitest'
-import { parsearFilasEstudiantes } from './importar-estudiantes'
+import {
+  agruparInstituciones,
+  parsearFecha,
+  parsearFilasEstudiantes,
+} from './importar-estudiantes'
+
+const base = {
+  contratista: 'Ana Rios',
+  municipio: 'Montería',
+  'institucion educativa': 'IE Simón Bolívar',
+  'NOMBRE COMPLETO DEL ALUMNO': '  Ana  Pérez  ',
+  'TIPO DE DOCUMENTO': 'T.I.',
+  'NUMERO DE DOCUMENTO': '1.234.567',
+  'fecha de entrega del certificado': '15/11/2026',
+}
+
+describe('parsearFecha', () => {
+  it('acepta DD/MM/AAAA, AAAA-MM-DD y serie de Excel', () => {
+    expect(parsearFecha('15/11/2026')).toBe('2026-11-15')
+    expect(parsearFecha('2026-11-15')).toBe('2026-11-15')
+    expect(parsearFecha('46341')).toBe('2026-11-15')
+  })
+  it('rechaza fechas inválidas', () => {
+    expect(parsearFecha('31/02/2026')).toBeNull()
+    expect(parsearFecha('mañana')).toBeNull()
+    expect(parsearFecha('')).toBeNull()
+  })
+})
 
 describe('parsearFilasEstudiantes', () => {
-  it('acepta encabezados en español y normaliza valores', () => {
-    const r = parsearFilasEstudiantes([
-      {
-        tipo_documento: 'T.I.',
-        numero_documento: '1.234.567',
-        nombre_completo: '  Ana  Pérez  ',
-      },
-    ])
+  it('lee las 7 columnas de la plantilla y normaliza valores', () => {
+    const r = parsearFilasEstudiantes([base])
     expect(r.errores).toEqual([])
     expect(r.validas).toEqual([
-      { tipo_documento: 'TI', numero_documento: '1234567', nombre_completo: 'Ana Pérez' },
+      {
+        fila: 2,
+        contratista: 'Ana Rios',
+        municipio: 'Montería',
+        institucion: 'IE Simón Bolívar',
+        tipo_documento: 'TI',
+        numero_documento: '1234567',
+        nombre_completo: 'Ana Pérez',
+        fecha_expedicion: '2026-11-15',
+      },
     ])
   })
 
-  it('omite filas vacías y reporta errores de tipo', () => {
+  it('omite filas vacías y reporta errores', () => {
     const r = parsearFilasEstudiantes([
-      { tipo_documento: '', numero_documento: '', nombre_completo: '' },
-      { tipo: 'PASAPORTE', documento: '99', nombre: 'Luis' },
-      { tipo: 'CC', documento: '88', nombre: '' },
+      {},
+      { ...base, 'TIPO DE DOCUMENTO': 'PASAPORTE' },
+      { ...base, 'NUMERO DE DOCUMENTO': '88', 'NOMBRE COMPLETO DEL ALUMNO': '' },
+      { ...base, 'NUMERO DE DOCUMENTO': '77', municipio: '' },
+      { ...base, 'NUMERO DE DOCUMENTO': '66', 'fecha de entrega del certificado': 'x' },
     ])
     expect(r.validas).toHaveLength(0)
-    expect(r.errores).toHaveLength(2)
-    expect(r.errores[0].fila).toBe(3)
+    expect(r.errores.map((e) => e.fila)).toEqual([3, 4, 5, 6])
     expect(r.errores[1].mensaje).toMatch(/Nombre/)
+    expect(r.errores[2].mensaje).toMatch(/Municipio/)
+    expect(r.errores[3].mensaje).toMatch(/Fecha/)
   })
 
-  it('detecta duplicados dentro del archivo', () => {
-    const r = parsearFilasEstudiantes([
-      { tipo: 'CC', documento: '100', nombre: 'A' },
-      { tipo: 'cc', documento: '100', nombre: 'B' },
-    ])
+  it('detecta documentos duplicados dentro del archivo', () => {
+    const r = parsearFilasEstudiantes([base, { ...base, 'TIPO DE DOCUMENTO': 'ti' }])
     expect(r.validas).toHaveLength(1)
     expect(r.errores[0].mensaje).toMatch(/duplicado/)
+  })
+})
+
+describe('agruparInstituciones', () => {
+  const fila = (n: number, o: Record<string, string> = {}) =>
+    parsearFilasEstudiantes([{ ...base, 'NUMERO DE DOCUMENTO': String(n), ...o }]).validas[0]
+
+  it('agrupa por institución + municipio, sin importar tildes ni mayúsculas', () => {
+    const r = agruparInstituciones([
+      fila(1),
+      fila(2, { 'institucion educativa': 'ie simon bolivar' }),
+      fila(3, { municipio: 'Cereté' }),
+    ])
+    expect(r.errores).toEqual([])
+    expect(r.instituciones).toHaveLength(2)
+    expect(r.instituciones[0].filas).toHaveLength(2)
+  })
+
+  it('marca error si una institución trae otro contratista u otra fecha', () => {
+    const r = agruparInstituciones([
+      fila(1),
+      fila(2, { contratista: 'Edgar Morales' }),
+      fila(3, { 'fecha de entrega del certificado': '20/11/2026' }),
+    ])
+    expect(r.instituciones[0].filas).toHaveLength(1)
+    expect(r.errores).toHaveLength(2)
   })
 })

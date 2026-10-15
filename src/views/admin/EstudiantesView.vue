@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
-import { parsearArchivoEstudiantes } from '@/lib/importar-estudiantes'
+import {
+  agruparInstituciones,
+  normalizarClave,
+  parsearArchivoEstudiantes,
+} from '@/lib/importar-estudiantes'
 import { TIPOS_DOCUMENTO, TIPOS_LABEL, normalizarNumero } from '@/lib/normalize'
 import { supabase } from '@/lib/supabase'
 import type { Estudiante, Institucion, TipoDocumento } from '@/types/database'
@@ -106,10 +110,7 @@ async function onExcel(ev: Event): Promise<void> {
   const input = ev.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (!file || !institucionId.value) {
-    error.value = 'Selecciona una institución antes de importar.'
-    return
-  }
+  if (!file) return
   error.value = ''
   ok.value = ''
   erroresImport.value = []
@@ -117,25 +118,98 @@ async function onExcel(ev: Event): Promise<void> {
   try {
     const buf = await file.arrayBuffer()
     const { validas, errores } = await parsearArchivoEstudiantes(buf)
-    erroresImport.value = errores.map((er) => `Fila ${er.fila}: ${er.mensaje}`)
-    if (!validas.length) {
-      error.value = 'No hay filas válidas para importar.'
+    const agrupado = agruparInstituciones(validas)
+    const avisos = [...errores, ...agrupado.errores]
+
+    // Contratistas registrados (los firmantes no fijos)
+    const { data: firmantes, error: eF } = await supabase
+      .from('firmantes')
+      .select('id, nombre, es_fijo')
+    const { data: existentes, error: eI } = await supabase
+      .from('instituciones')
+      .select('id, nombre, municipio')
+    if (eF || eI) {
+      error.value = 'No se pudieron consultar contratistas e instituciones.'
       return
     }
-    const filas = validas.map((v) => ({
-      institucion_id: institucionId.value,
-      tipo_documento: v.tipo_documento,
-      numero_documento: v.numero_documento,
-      nombre_completo: v.nombre_completo,
-    }))
-    const { error: e } = await supabase.from('estudiantes').upsert(filas, {
-      onConflict: 'institucion_id,tipo_documento,numero_documento',
-    })
-    if (e) {
-      error.value = 'Error al guardar en la base de datos: ' + e.message
+    const contratistas = new Map(
+      (firmantes ?? []).filter((f) => !f.es_fijo).map((f) => [normalizarClave(f.nombre), f.id]),
+    )
+    const instExistentes = new Map(
+      (existentes ?? []).map((i) => [
+        `${normalizarClave(i.nombre)}|${normalizarClave(i.municipio)}`,
+        i.id,
+      ]),
+    )
+
+    let totalEstudiantes = 0
+    let creadas = 0
+    let actualizadas = 0
+
+    for (const inst of agrupado.instituciones) {
+      const contratistaId = contratistas.get(normalizarClave(inst.contratista))
+      if (!contratistaId) {
+        avisos.push({
+          fila: inst.filas[0].fila,
+          mensaje: `Contratista "${inst.contratista}" no está registrado en Firmantes (se omitió "${inst.nombre}", ${inst.filas.length} estudiantes)`,
+        })
+        continue
+      }
+
+      let institucionId = instExistentes.get(inst.clave)
+      if (institucionId) {
+        const { error: e } = await supabase
+          .from('instituciones')
+          .update({ fecha_expedicion: inst.fecha_expedicion, contratista_id: contratistaId })
+          .eq('id', institucionId)
+        if (e) {
+          avisos.push({ fila: inst.filas[0].fila, mensaje: `No se pudo actualizar "${inst.nombre}"` })
+          continue
+        }
+        actualizadas++
+      } else {
+        const { data: nueva, error: e } = await supabase
+          .from('instituciones')
+          .insert({
+            nombre: inst.nombre,
+            municipio: inst.municipio,
+            fecha_expedicion: inst.fecha_expedicion,
+            activa: true,
+            contratista_id: contratistaId,
+          })
+          .select('id')
+          .single()
+        if (e || !nueva) {
+          avisos.push({ fila: inst.filas[0].fila, mensaje: `No se pudo crear "${inst.nombre}"` })
+          continue
+        }
+        institucionId = nueva.id
+        creadas++
+      }
+
+      const filas = inst.filas.map((v) => ({
+        institucion_id: institucionId!,
+        tipo_documento: v.tipo_documento,
+        numero_documento: v.numero_documento,
+        nombre_completo: v.nombre_completo,
+      }))
+      const { error: e } = await supabase.from('estudiantes').upsert(filas, {
+        onConflict: 'institucion_id,tipo_documento,numero_documento',
+      })
+      if (e) {
+        avisos.push({ fila: inst.filas[0].fila, mensaje: `Error al guardar estudiantes de "${inst.nombre}": ${e.message}` })
+        continue
+      }
+      totalEstudiantes += filas.length
+    }
+
+    erroresImport.value = avisos.sort((a, b) => a.fila - b.fila).map((er) => `Fila ${er.fila}: ${er.mensaje}`)
+    if (!totalEstudiantes) {
+      error.value = 'No se importó ningún estudiante.'
       return
     }
-    ok.value = `Se importaron o actualizaron ${validas.length} estudiantes.`
+    ok.value = `Se importaron o actualizaron ${totalEstudiantes} estudiantes (${creadas} instituciones nuevas, ${actualizadas} actualizadas).`
+    await cargarInstituciones()
     await cargarEstudiantes()
   } catch {
     error.value = 'No se pudo leer el archivo. Use .xlsx o .csv.'
@@ -182,16 +256,24 @@ const paginas = () => Math.max(1, Math.ceil(total.value / TAM))
 
     <div class="card mb-6">
       <p class="text-sm text-slate-600 mb-3">
-        Importar Excel o CSV con columnas
-        <code class="text-xs">tipo_documento</code>,
-        <code class="text-xs">numero_documento</code>,
-        <code class="text-xs">nombre_completo</code>.
+        Importar Excel o CSV con las columnas:
+        <code class="text-xs">contratista</code>,
+        <code class="text-xs">municipio</code>,
+        <code class="text-xs">institucion educativa</code>,
+        <code class="text-xs">NOMBRE COMPLETO DEL ALUMNO</code>,
+        <code class="text-xs">TIPO DE DOCUMENTO</code>,
+        <code class="text-xs">NUMERO DE DOCUMENTO</code>,
+        <code class="text-xs">fecha de entrega del certificado</code>.
         <a href="/plantilla-estudiantes.csv" class="text-primary-500 underline" download>Descargar plantilla</a>
+      </p>
+      <p class="text-xs text-slate-500 mb-3">
+        Las instituciones se crean o actualizan automáticamente. El contratista debe estar
+        registrado antes en Firmantes (con su firma) y escrito igual en el archivo.
       </p>
       <input
         type="file"
         accept=".xlsx,.xls,.csv"
-        :disabled="importando || !institucionId"
+        :disabled="importando"
         @change="onExcel"
       />
       <ul v-if="erroresImport.length" class="mt-3 text-sm text-amber-700 space-y-1">
