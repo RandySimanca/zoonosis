@@ -83,7 +83,12 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      listar_instituciones_activas: {
+        Args: Record<string, never>
+        Returns: { id: string; nombre: string; municipio: string }[]
+      }
+    }
     Enums: Record<string, never>
   }
 }

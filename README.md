@@ -154,8 +154,9 @@ certificados_zoonosis/
 │   ├── types/
 │   │   └── database.ts           # Tipos TypeScript del esquema DB
 │   ├── views/
-│   │   ├── InicioView.vue        # Página pública (Fase 3)
-│   │   └── AdminLoginView.vue    # Panel admin (Fase 4)
+│   │   ├── InicioView.vue
+│   │   ├── AdminLoginView.vue
+│   │   └── admin/                # CRUD instituciones, firmantes, estudiantes
 │   ├── App.vue
 │   └── main.ts
 ├── supabase/
@@ -164,7 +165,8 @@ certificados_zoonosis/
 │   ├── migrations/
 │   │   ├── 20260101000001_schema.sql   # Tablas y constraints
 │   │   ├── 20260101000002_rls.sql      # Row Level Security
-│   │   └── 20260101000003_storage.sql  # Buckets privados
+│   │   ├── 20260101000003_storage.sql  # Buckets privados
+│   │   └── 20260101000004_rpc_indices.sql
 │   └── functions/
 │       └── _shared/
 │           └── cors.ts           # Cabeceras CORS compartidas
@@ -186,7 +188,7 @@ certificados_zoonosis/
 npm test
 ```
 
-Las pruebas de normalización de documentos e importación se añadirán en la Fase 5.
+Cubre normalización de documentos e importación de filas Excel.
 
 ---
 
@@ -195,10 +197,10 @@ Las pruebas de normalización de documentos e importación se añadirán en la F
 | Fase | Estado | Descripción |
 |---|---|---|
 | **1 — Base** | ✅ Completada | Estructura, migraciones, RLS, seed, README |
-| **2 — PDF** | ⏳ Pendiente | Edge Function `generar-certificado` |
-| **3 — Página pública** | ⏳ Pendiente | Formulario con Turnstile |
-| **4 — Panel admin** | ⏳ Pendiente | CRUD + importación Excel |
-| **5 — Endurecimiento** | ⏳ Pendiente | Rate limiting, cabeceras seguridad, pruebas |
+| **2 — PDF** | ✅ Completada | Edge Function `generar-certificado` |
+| **3 — Página pública** | ✅ Completada | Formulario con Turnstile |
+| **4 — Panel admin** | ✅ Completada | CRUD + importación Excel |
+| **5 — Endurecimiento** | ✅ Completada | Rate limiting, cabeceras seguridad, pruebas |
 | **6 — Verificación** | 🔲 Opcional | QR + página `/verificar/:codigo` |
 
 ---

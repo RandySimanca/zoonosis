@@ -76,3 +76,8 @@ inspector_port = 8083
 enabled = false
 port = 54327
 backend = "postgres"
+
+# El formulario público llama esta función sin JWT de usuario
+[functions.generar-certificado]
+enabled = true
+verify_jwt = false

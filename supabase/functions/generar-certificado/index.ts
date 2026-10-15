@@ -58,8 +58,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const supabase = crearClienteServicio()
 
-    // 6. Registrar intento (antes de la consulta para auditoría completa)
+    // 6. Rate limiting por hash de IP (Fase 5)
     const ipHash = await hashearIP(ip)
+    const limitado = await excedioLimite(supabase, ipHash)
+    if (limitado) {
+      return jsonError(429, "Demasiados intentos. Espera unos minutos e intenta de nuevo.")
+    }
 
     // 7. Buscar estudiante en esa institución específica
     const { data: estudiante, error: errEst } = await supabase
@@ -153,6 +157,9 @@ const MSG_NO_ENCONTRADO =
   "No encontramos un certificado con esos datos. " +
   "Verifica la institución, el tipo y el número de documento."
 
+const RATE_LIMIT_MAX = 10
+const RATE_LIMIT_MINUTOS = 15
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 function jsonError(status: number, message: string): Response {
@@ -168,6 +175,24 @@ function obtenerIP(req: Request): string {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     "unknown"
   )
+}
+
+async function excedioLimite(
+  supabase: ReturnType<typeof crearClienteServicio>,
+  ipHash: string
+): Promise<boolean> {
+  const desde = new Date(Date.now() - RATE_LIMIT_MINUTOS * 60 * 1000).toISOString()
+  const { count, error } = await supabase
+    .from("intentos_descarga")
+    .select("*", { count: "exact", head: true })
+    .eq("ip_hash", ipHash)
+    .gte("creado_en", desde)
+
+  if (error) {
+    console.error("Error consultando rate limit:", error)
+    return false
+  }
+  return (count ?? 0) >= RATE_LIMIT_MAX
 }
 
 async function hashearIP(ip: string): Promise<string> {
