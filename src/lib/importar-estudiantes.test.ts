@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  agruparInstituciones,
+  agruparJornadas,
   parsearFecha,
   parsearFilasEstudiantes,
 } from './importar-estudiantes'
@@ -66,30 +66,58 @@ describe('parsearFilasEstudiantes', () => {
     expect(r.validas).toHaveLength(1)
     expect(r.errores[0].mensaje).toMatch(/duplicado/)
   })
+
+  it('conserva ceros iniciales en números de documento', () => {
+    const r = parsearFilasEstudiantes([
+      { ...base, 'NUMERO DE DOCUMENTO': '0012345' },
+    ])
+    expect(r.validas[0].numero_documento).toBe('0012345')
+  })
 })
 
-describe('agruparInstituciones', () => {
+describe('agruparJornadas', () => {
   const fila = (n: number, o: Record<string, string> = {}) =>
     parsearFilasEstudiantes([{ ...base, 'NUMERO DE DOCUMENTO': String(n), ...o }]).validas[0]
 
-  it('agrupa por institución + municipio, sin importar tildes ni mayúsculas', () => {
-    const r = agruparInstituciones([
+  it('agrupa por institución + municipio + contratista + fecha', () => {
+    const r = agruparJornadas([
       fila(1),
       fila(2, { 'institucion educativa': 'ie simon bolivar' }),
       fila(3, { municipio: 'Cereté' }),
     ])
     expect(r.errores).toEqual([])
-    expect(r.instituciones).toHaveLength(2)
-    expect(r.instituciones[0].filas).toHaveLength(2)
+    // Fila 1 y 2 van a la misma jornada (misma inst, mismo contratista, misma fecha)
+    // Fila 3 es otra jornada (diferente municipio → diferente institución)
+    expect(r.jornadas).toHaveLength(2)
+    expect(r.jornadas[0].filas).toHaveLength(2)
   })
 
-  it('marca error si una institución trae otro contratista u otra fecha', () => {
-    const r = agruparInstituciones([
+  it('diferente contratista en misma institución crea jornada separada (sin error)', () => {
+    const r = agruparJornadas([
+      fila(1),
+      fila(2, { contratista: 'Edgar Morales' }),
+    ])
+    // Dos jornadas distintas, no un error
+    expect(r.jornadas).toHaveLength(2)
+    expect(r.errores).toEqual([])
+  })
+
+  it('diferente fecha en misma institución crea jornada separada (sin error)', () => {
+    const r = agruparJornadas([
+      fila(1),
+      fila(2, { 'fecha de entrega del certificado': '20/11/2026' }),
+    ])
+    expect(r.jornadas).toHaveLength(2)
+    expect(r.errores).toEqual([])
+  })
+
+  it('tres jornadas distintas en la misma institución', () => {
+    const r = agruparJornadas([
       fila(1),
       fila(2, { contratista: 'Edgar Morales' }),
       fila(3, { 'fecha de entrega del certificado': '20/11/2026' }),
     ])
-    expect(r.instituciones[0].filas).toHaveLength(1)
-    expect(r.errores).toHaveLength(2)
+    expect(r.jornadas).toHaveLength(3)
+    expect(r.errores).toEqual([])
   })
 })

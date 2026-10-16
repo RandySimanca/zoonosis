@@ -23,10 +23,11 @@ export interface ResultadoImportacion {
   errores: ErrorFila[]
 }
 
-/** Institución resultante de agrupar las filas del archivo. */
-export interface InstitucionImportada {
+/** Jornada resultante de agrupar las filas del archivo. */
+export interface JornadaImportada {
   clave: string
-  nombre: string
+  claveInstitucion: string
+  nombre_institucion: string
   municipio: string
   fecha_expedicion: string
   contratista: string
@@ -190,24 +191,27 @@ export function parsearFilasEstudiantes(rows: Record<string, unknown>[]): Result
 }
 
 /**
- * Agrupa las filas por institución (nombre + municipio).
- * Cada institución tiene un solo contratista y una sola fecha: las filas que
- * contradigan a la primera de su institución se reportan como error.
+ * Agrupa las filas por jornada (institución + municipio + contratista + fecha).
+ * Cada combinación única genera una jornada separada.
+ * Una misma institución puede tener múltiples jornadas con diferentes contratistas o fechas.
  */
-export function agruparInstituciones(filas: FilaEstudiante[]): {
-  instituciones: InstitucionImportada[]
+export function agruparJornadas(filas: FilaEstudiante[]): {
+  jornadas: JornadaImportada[]
   errores: ErrorFila[]
 } {
-  const mapa = new Map<string, InstitucionImportada>()
+  const mapa = new Map<string, JornadaImportada>()
   const errores: ErrorFila[] = []
 
   for (const f of filas) {
-    const clave = `${normalizarClave(f.institucion)}|${normalizarClave(f.municipio)}`
+    const claveInst = `${normalizarClave(f.institucion)}|${normalizarClave(f.municipio)}`
+    const clave = `${claveInst}|${normalizarClave(f.contratista)}|${f.fecha_expedicion}`
+
     const actual = mapa.get(clave)
     if (!actual) {
       mapa.set(clave, {
         clave,
-        nombre: f.institucion,
+        claveInstitucion: claveInst,
+        nombre_institucion: f.institucion,
         municipio: f.municipio,
         fecha_expedicion: f.fecha_expedicion,
         contratista: f.contratista,
@@ -215,24 +219,10 @@ export function agruparInstituciones(filas: FilaEstudiante[]): {
       })
       continue
     }
-    if (normalizarClave(f.contratista) !== normalizarClave(actual.contratista)) {
-      errores.push({
-        fila: f.fila,
-        mensaje: `"${f.institucion}" ya tiene otro contratista en el archivo ("${actual.contratista}")`,
-      })
-      continue
-    }
-    if (f.fecha_expedicion !== actual.fecha_expedicion) {
-      errores.push({
-        fila: f.fila,
-        mensaje: `"${f.institucion}" ya tiene otra fecha de entrega en el archivo (${actual.fecha_expedicion})`,
-      })
-      continue
-    }
     actual.filas.push(f)
   }
 
-  return { instituciones: [...mapa.values()], errores }
+  return { jornadas: [...mapa.values()], errores }
 }
 
 /** .xlsx (zip: "PK") o .xls antiguo (OLE2). Lo demás se trata como CSV de texto. */
