@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
 import {
-  agruparInstituciones,
+  agruparJornadas,
   normalizarClave,
   parsearArchivoEstudiantes,
 } from '@/lib/importar-estudiantes'
@@ -135,7 +135,7 @@ async function onExcel(ev: Event): Promise<void> {
   try {
     const buf = await file.arrayBuffer()
     const { validas, errores } = await parsearArchivoEstudiantes(buf)
-    const agrupado = agruparInstituciones(validas)
+    const agrupado = agruparJornadas(validas)
     const avisos = [...errores, ...agrupado.errores]
 
     // Contratistas registrados (los firmantes no fijos)
@@ -163,8 +163,8 @@ async function onExcel(ev: Event): Promise<void> {
     let creadas = 0
     let actualizadas = 0
 
-    for (const inst of agrupado.instituciones) {
-      const contratistaId = mapaContratistas.get(normalizarClave(inst.contratista))
+    for (const jornada of agrupado.jornadas) {
+      const contratistaId = mapaContratistas.get(normalizarClave(jornada.contratista))
       if (!contratistaId) {
         const contratistasExistentes = (firmantes ?? [])
           .filter((f) => !f.es_fijo)
@@ -174,20 +174,20 @@ async function onExcel(ev: Event): Promise<void> {
           ? ` Contratistas disponibles: ${contratistasExistentes}`
           : ' No hay contratistas registrados. Ve a Firmantes para registrarlos primero.'
         avisos.push({
-          fila: inst.filas[0].fila,
-          mensaje: `Contratista "${inst.contratista}" no está registrado en Firmantes (se omitió "${inst.nombre}", ${inst.filas.length} estudiantes).${sugerencia}`,
+          fila: jornada.filas[0].fila,
+          mensaje: `Contratista "${jornada.contratista}" no está registrado en Firmantes (se omitió "${jornada.nombre_institucion}", ${jornada.filas.length} estudiantes).${sugerencia}`,
         })
         continue
       }
 
-      let institucionId = instExistentes.get(inst.clave)
+      let institucionId = instExistentes.get(jornada.claveInstitucion)
       if (institucionId) {
         const { error: e } = await supabase
           .from('instituciones')
-          .update({ fecha_expedicion: inst.fecha_expedicion, contratista_id: contratistaId, activa: true })
+          .update({ fecha_expedicion: jornada.fecha_expedicion, contratista_id: contratistaId, activa: true })
           .eq('id', institucionId)
         if (e) {
-          avisos.push({ fila: inst.filas[0].fila, mensaje: `No se pudo actualizar "${inst.nombre}"` })
+          avisos.push({ fila: jornada.filas[0].fila, mensaje: `No se pudo actualizar "${jornada.nombre_institucion}"` })
           continue
         }
         actualizadas++
@@ -195,23 +195,23 @@ async function onExcel(ev: Event): Promise<void> {
         const { data: nueva, error: e } = await supabase
           .from('instituciones')
           .insert({
-            nombre: inst.nombre,
-            municipio: inst.municipio,
-            fecha_expedicion: inst.fecha_expedicion,
+            nombre: jornada.nombre_institucion,
+            municipio: jornada.municipio,
+            fecha_expedicion: jornada.fecha_expedicion,
             activa: true,
             contratista_id: contratistaId,
           })
           .select('id')
           .single()
         if (e || !nueva) {
-          avisos.push({ fila: inst.filas[0].fila, mensaje: `No se pudo crear "${inst.nombre}"` })
+          avisos.push({ fila: jornada.filas[0].fila, mensaje: `No se pudo crear "${jornada.nombre_institucion}"` })
           continue
         }
         institucionId = nueva.id
         creadas++
       }
 
-      const filas = inst.filas.map((v) => ({
+      const filas = jornada.filas.map((v) => ({
         institucion_id: institucionId!,
         tipo_documento: v.tipo_documento,
         numero_documento: v.numero_documento,
@@ -221,7 +221,7 @@ async function onExcel(ev: Event): Promise<void> {
         onConflict: 'institucion_id,tipo_documento,numero_documento',
       })
       if (e) {
-        avisos.push({ fila: inst.filas[0].fila, mensaje: `Error al guardar estudiantes de "${inst.nombre}": ${e.message}` })
+        avisos.push({ fila: jornada.filas[0].fila, mensaje: `Error al guardar estudiantes de "${jornada.nombre_institucion}": ${e.message}` })
         continue
       }
       totalEstudiantes += filas.length
