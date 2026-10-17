@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import TurnstileWidget from '@/components/TurnstileWidget.vue'
+// import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { supabase } from '@/lib/supabase'
 import { TIPOS_DOCUMENTO, TIPOS_LABEL, normalizarNumero } from '@/lib/normalize'
 
@@ -20,9 +20,9 @@ const numeroDocumento = ref('')
 const captchaToken = ref('')
 const enviando = ref(false)
 const errorForm = ref('')
-const turnstile = ref<{ reset: () => void } | null>(null)
+// const turnstile = ref<{ reset: () => void } | null>(null)
 
-const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''
+// const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''
 
 onMounted(async () => {
   try {
@@ -58,10 +58,10 @@ async function descargar(): Promise<void> {
     errorForm.value = 'Completa la institución, el tipo y el número de documento.'
     return
   }
-  if (siteKey && !captchaToken.value) {
-    errorForm.value = 'Completa la verificación de seguridad.'
-    return
-  }
+  // if (siteKey && !captchaToken.value) {
+  //   errorForm.value = 'Completa la verificación de seguridad.'
+  //   return
+  // }
 
   enviando.value = true
   try {
@@ -78,7 +78,7 @@ async function descargar(): Promise<void> {
         institucion_id: institucionId.value,
         tipo_documento: tipoDocumento.value,
         numero_documento: numero,
-        captcha_token: captchaToken.value || 'dev-bypass',
+        captcha_token: 'dev-bypass',
       }),
     })
 
@@ -91,7 +91,7 @@ async function descargar(): Promise<void> {
         /* cuerpo no JSON */
       }
       errorForm.value = mensaje
-      turnstile.value?.reset()
+      // turnstile.value?.reset()
       return
     }
 
@@ -102,10 +102,10 @@ async function descargar(): Promise<void> {
     a.download = `Certificado_${numero}.pdf`
     a.click()
     URL.revokeObjectURL(url)
-    turnstile.value?.reset()
+    // turnstile.value?.reset()
   } catch {
     errorForm.value = 'Error de red. Revisa tu conexión e intenta de nuevo.'
-    turnstile.value?.reset()
+    // turnstile.value?.reset()
   } finally {
     enviando.value = false
   }
@@ -176,12 +176,12 @@ async function descargar(): Promise<void> {
             />
           </div>
 
-          <TurnstileWidget
+          <!-- <TurnstileWidget
             v-if="siteKey"
             ref="turnstile"
             :site-key="siteKey"
             @token="captchaToken = $event"
-          />
+          /> -->
 
           <div v-if="errorForm" class="alert-error">{{ errorForm }}</div>
 
