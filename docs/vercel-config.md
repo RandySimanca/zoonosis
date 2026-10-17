@@ -2,6 +2,34 @@
 
 Para que el proyecto funcione correctamente en Vercel, debes configurar las siguientes variables de entorno.
 
+## ⚠️ IMPORTANTE: Primero Aplicar las Migraciones
+
+Antes de configurar las variables en Vercel, asegúrate de aplicar las migraciones de la base de datos en Supabase producción.
+
+### Pasos para Aplicar Migraciones:
+
+1. **Enlazar tu proyecto local con Supabase producción**:
+   ```bash
+   supabase link --project-ref <PROJECT_REF>
+   ```
+   El `PROJECT_REF` lo encuentras en el dashboard de Supabase → Settings → General
+
+2. **Aplicar todas las migraciones**:
+   ```bash
+   supabase db push
+   ```
+
+3. **Verificar que las migraciones se aplicaron**:
+   - Ve al dashboard de Supabase
+   - Database → Migrations
+   - Deberías ver todas las migraciones (001-007)
+
+Si no aplicas las migraciones, verás errores como:
+- "Could not find the function public.listar_instituciones_activas"
+- "No se pudieron cargar las instituciones"
+
+
+
 ## Variables de Entorno Requeridas
 
 ### Variables del Frontend (VITE_)
