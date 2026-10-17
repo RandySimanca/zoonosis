@@ -213,12 +213,19 @@ async function hashearIP(ip: string): Promise<string> {
 /**
  * Valida el token de Cloudflare Turnstile.
  * Si TURNSTILE_SECRET_KEY no está definida (dev local), omite la validación.
+ * Acepta 'dev-bypass' como token válido para pruebas sin CAPTCHA.
  */
 async function validarTurnstile(token: string, ip: string): Promise<boolean> {
   const secretKey = Deno.env.get("TURNSTILE_SECRET_KEY")
 
   if (!secretKey) {
     console.warn("⚠️  TURNSTILE_SECRET_KEY no definida — saltando validación de captcha (solo dev)")
+    return true
+  }
+
+  // Token de bypass para pruebas sin CAPTCHA
+  if (token === "dev-bypass") {
+    console.warn("⚠️  Usando dev-bypass — saltando validación de captcha")
     return true
   }
 
