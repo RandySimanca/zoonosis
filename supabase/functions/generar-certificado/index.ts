@@ -31,6 +31,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(400, "El cuerpo de la solicitud debe ser JSON válido")
     }
 
+    console.log("📥 Body recibido:", body)
+
     const { institucion_id, tipo_documento, numero_documento, captcha_token } = body
 
     if (!institucion_id || !tipo_documento || !numero_documento || !captcha_token) {
@@ -56,6 +58,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(404, MSG_NO_ENCONTRADO)
     }
 
+    console.log("🔍 Buscando estudiante:", {
+      institucion_id,
+      tipo_documento,
+      numero_documento_original: numero_documento,
+      numero_documento_normalizado: numeroNorm,
+    })
+
     const supabase = crearClienteServicio()
 
     // 6. Rate limiting por hash de IP (Fase 5)
@@ -68,11 +77,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // 7. Buscar estudiante en esa institución específica
     const { data: estudiante, error: errEst } = await supabase
       .from("estudiantes")
-      .select("id, nombre_completo, tipo_documento, numero_documento")
+      .select("id, nombre_completo, tipo_documento, numero_documento, institucion_id")
       .eq("institucion_id", institucion_id)
       .eq("tipo_documento", tipo_documento)
       .eq("numero_documento", numeroNorm)
       .maybeSingle()
+
+    console.log("📊 Resultado búsqueda:", {
+      estudiante,
+      error: errEst,
+    })
 
     if (errEst) {
       console.error("Error al buscar estudiante:", errEst)
@@ -82,6 +96,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (!estudiante) {
+      console.warn("⚠️ Estudiante no encontrado con:", {
+        institucion_id,
+        tipo_documento,
+        numeroNorm,
+      })
       await registrarIntento(supabase, ipHash, false)
       return jsonError(404, MSG_NO_ENCONTRADO)
     }
