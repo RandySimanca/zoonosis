@@ -181,7 +181,55 @@ certificados_zoonosis/
 
 ---
 
-## 8. Pruebas
+## 8. Plantilla de Importación de Estudiantes
+
+El sistema incluye una plantilla de Excel estructurada para importar estudiantes masivamente.
+
+### Estructura de la Plantilla
+
+La plantilla (`public/plantilla-estudiantes.xlsx`) contiene 3 hojas:
+
+1. **INSTRUCCIONES**: Guía detallada paso a paso
+2. **DATOS**: Hoja principal con las columnas requeridas
+3. **TIPOS_DOC**: Referencia de tipos de documento aceptados
+
+### Columnas Requeridas
+
+| Columna | Descripción | Ejemplo |
+|---------|-------------|---------|
+| contratista | Nombre del contratista (firmante) | ANA PAOLA RÍOS MARTÍNEZ |
+| municipio | Municipio de la institución | Montería |
+| institucion educativa | Nombre de la institución | Institución Educativa Simón Bolívar |
+| NOMBRE COMPLETO DEL ALUMNO | Nombre completo del estudiante | JUAN CAMILO PÉREZ GÓMEZ |
+| TIPO DE DOCUMENTO | Tipo de documento (RC, TI, CC, CE, PPT, PEP) | TI |
+| NUMERO DE DOCUMENTO | Número sin puntos ni espacios | 1234567890 |
+| fecha de entrega del certificado | Fecha (DD/MM/AAAA o AAAA-MM-DD) | 15/11/2026 |
+
+### Flujo de Importación
+
+1. **Registrar contratistas** en el panel admin → Firmantes (con sus firmas)
+2. **Completar la plantilla** siguiendo las instrucciones
+3. **Importar** en Estudiantes → Importar Excel
+4. El sistema:
+   - Crea o actualiza instituciones automáticamente
+   - Agrupa estudiantes por jornada (institución + municipio + contratista + fecha)
+   - Asigna firmas según el contratista de cada jornada
+
+### Regenerar la Plantilla
+
+Si necesitas regenerar la plantilla con cambios:
+
+```bash
+npx tsx scripts/generar-plantilla.ts
+```
+
+### Documentación Completa
+
+Ver la guía detallada en `docs/guia-plantilla.md`.
+
+---
+
+## 9. Pruebas
 
 ```bash
 # Ejecutar suite de pruebas (Vitest)
@@ -192,7 +240,7 @@ Cubre normalización de documentos e importación de filas Excel.
 
 ---
 
-## 9. Fases del proyecto
+## 10. Fases del proyecto
 
 | Fase | Estado | Descripción |
 |---|---|---|
@@ -205,7 +253,7 @@ Cubre normalización de documentos e importación de filas Excel.
 
 ---
 
-## 10. Despliegue en producción
+## 11. Despliegue en producción
 
 ```bash
 # Enlazar con el proyecto Supabase en la nube
@@ -224,7 +272,7 @@ npm run build
 
 ---
 
-## Consideraciones legales
+## 12. Consideraciones legales
 
 - **Ley 1581 de 2012 (Colombia)**: el sistema almacena datos de posibles menores de edad.
   - Las IPs nunca se guardan en claro; se almacena su hash SHA-256.

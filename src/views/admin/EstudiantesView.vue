@@ -264,8 +264,12 @@ const paginas = () => Math.max(1, Math.ceil(total.value / TAM))
         <code class="text-xs">TIPO DE DOCUMENTO</code>,
         <code class="text-xs">NUMERO DE DOCUMENTO</code>,
         <code class="text-xs">fecha de entrega del certificado</code>.
-        <a href="/plantilla-estudiantes.xlsx" class="text-primary-500 underline" download>Descargar plantilla Excel</a>
       </p>
+      <div class="flex gap-4 mb-3">
+        <a href="/plantilla-estudiantes.xlsx" class="text-primary-500 underline text-sm" download>Descargar plantilla Excel</a>
+        <a href="/plantilla-estudiantes.csv" class="text-primary-500 underline text-sm" download>Descargar plantilla CSV</a>
+        <a href="/docs/guia-plantilla.md" target="_blank" class="text-primary-500 underline text-sm">Ver guía completa</a>
+      </div>
       <p class="text-xs text-slate-500 mb-3">
         Las instituciones se crean o actualizan automáticamente. El contratista debe estar
         registrado antes en Firmantes (con su firma) y escrito igual en el archivo.
