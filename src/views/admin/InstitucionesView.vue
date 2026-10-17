@@ -107,13 +107,43 @@ async function eliminar(inst: Institucion): Promise<void> {
   ok.value = 'Institución eliminada.'
   await cargar()
 }
+
+async function activarTodas(): Promise<void> {
+  if (!confirm('¿Activar todas las instituciones? Esto las hará visibles en el formulario público.')) {
+    return
+  }
+  const { error: e } = await supabase.from('instituciones').update({ activa: true })
+  if (e) {
+    error.value = 'No se pudieron activar las instituciones.'
+    return
+  }
+  ok.value = 'Todas las instituciones han sido activadas.'
+  await cargar()
+}
+
+async function desactivarTodas(): Promise<void> {
+  if (!confirm('¿Desactivar todas las instituciones? Esto las ocultará del formulario público.')) {
+    return
+  }
+  const { error: e } = await supabase.from('instituciones').update({ activa: false })
+  if (e) {
+    error.value = 'No se pudieron desactivar las instituciones.'
+    return
+  }
+  ok.value = 'Todas las instituciones han sido desactivadas.'
+  await cargar()
+}
 </script>
 
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-primary-500">Instituciones</h1>
-      <button type="button" class="btn-primary" @click="abrirNueva">Nueva</button>
+      <div class="flex gap-2">
+        <button type="button" class="btn-secondary text-sm" @click="activarTodas">Activar todas</button>
+        <button type="button" class="btn-secondary text-sm" @click="desactivarTodas">Desactivar todas</button>
+        <button type="button" class="btn-primary" @click="abrirNueva">Nueva</button>
+      </div>
     </div>
     <div v-if="error" class="alert-error mb-4">{{ error }}</div>
     <div v-if="ok" class="alert-success mb-4">{{ ok }}</div>

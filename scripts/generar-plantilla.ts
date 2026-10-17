@@ -13,6 +13,7 @@ const hojaInstrucciones = [
   ['   - Nombre completo del contratista (persona que firma el certificado)'],
   ['   - Debe estar registrado previamente en el panel admin → Firmantes'],
   ['   - El nombre debe coincidir exactamente con el registrado en el sistema'],
+  ['   - IMPORTANTE: En Firmantes, NO marcar "Firmante fijo"'],
   ['   - Ejemplo: ANA PAOLA RÍOS MARTÍNEZ'],
   [''],
   ['2. municipio'],

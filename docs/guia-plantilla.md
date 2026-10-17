@@ -45,7 +45,11 @@ Antes de importar estudiantes, debes registrar los contratistas en el sistema:
    - Nombre completo (debe coincidir exactamente con la plantilla)
    - Cargo
    - Firma (sube la imagen de la firma)
+   - **Importante**: Deja la casilla "Firmante fijo" sin marcar
 4. Guarda cada firmante
+
+> **Nota**: Los contratistas son firmantes que varían según la jornada. No deben marcarse como "Firmante fijo".
+> Los firmantes fijos aparecen en todos los certificados automáticamente.
 
 ### Paso 2: Completar la Plantilla
 

@@ -19,6 +19,8 @@ const error = ref('')
 const ok = ref('')
 const importando = ref(false)
 const erroresImport = ref<string[]>([])
+const contratistas = ref<{ id: string; nombre: string; es_fijo: boolean }[]>([])
+const contratistasCargando = ref(false)
 
 const form = reactive({
   tipo_documento: 'TI' as TipoDocumento,
@@ -36,6 +38,20 @@ async function cargarInstituciones(): Promise<void> {
   if (!institucionId.value && instituciones.value[0]) {
     institucionId.value = instituciones.value[0].id
   }
+}
+
+async function cargarContratistas(): Promise<void> {
+  contratistasCargando.value = true
+  const { data, error: e } = await supabase
+    .from('firmantes')
+    .select('id, nombre, es_fijo')
+    .order('nombre')
+  if (e) {
+    error.value = 'No se pudieron cargar los contratistas.'
+  } else {
+    contratistas.value = data ?? []
+  }
+  contratistasCargando.value = false
 }
 
 async function cargarEstudiantes(): Promise<void> {
@@ -63,6 +79,7 @@ async function cargarEstudiantes(): Promise<void> {
 onMounted(async () => {
   await cargarInstituciones()
   await cargarEstudiantes()
+  await cargarContratistas()
 })
 
 watch(institucionId, () => {
@@ -132,7 +149,7 @@ async function onExcel(ev: Event): Promise<void> {
       error.value = 'No se pudieron consultar contratistas e instituciones.'
       return
     }
-    const contratistas = new Map(
+    const mapaContratistas = new Map(
       (firmantes ?? []).filter((f) => !f.es_fijo).map((f) => [normalizarClave(f.nombre), f.id]),
     )
     const instExistentes = new Map(
@@ -147,11 +164,18 @@ async function onExcel(ev: Event): Promise<void> {
     let actualizadas = 0
 
     for (const inst of agrupado.instituciones) {
-      const contratistaId = contratistas.get(normalizarClave(inst.contratista))
+      const contratistaId = mapaContratistas.get(normalizarClave(inst.contratista))
       if (!contratistaId) {
+        const contratistasExistentes = (firmantes ?? [])
+          .filter((f) => !f.es_fijo)
+          .map((f) => f.nombre)
+          .join(', ')
+        const sugerencia = contratistasExistentes
+          ? ` Contratistas disponibles: ${contratistasExistentes}`
+          : ' No hay contratistas registrados. Ve a Firmantes para registrarlos primero.'
         avisos.push({
           fila: inst.filas[0].fila,
-          mensaje: `Contratista "${inst.contratista}" no está registrado en Firmantes (se omitió "${inst.nombre}", ${inst.filas.length} estudiantes)`,
+          mensaje: `Contratista "${inst.contratista}" no está registrado en Firmantes (se omitió "${inst.nombre}", ${inst.filas.length} estudiantes).${sugerencia}`,
         })
         continue
       }
@@ -160,7 +184,7 @@ async function onExcel(ev: Event): Promise<void> {
       if (institucionId) {
         const { error: e } = await supabase
           .from('instituciones')
-          .update({ fecha_expedicion: inst.fecha_expedicion, contratista_id: contratistaId })
+          .update({ fecha_expedicion: inst.fecha_expedicion, contratista_id: contratistaId, activa: true })
           .eq('id', institucionId)
         if (e) {
           avisos.push({ fila: inst.filas[0].fila, mensaje: `No se pudo actualizar "${inst.nombre}"` })
@@ -208,7 +232,7 @@ async function onExcel(ev: Event): Promise<void> {
       error.value = 'No se importó ningún estudiante.'
       return
     }
-    ok.value = `Se importaron o actualizaron ${totalEstudiantes} estudiantes (${creadas} instituciones nuevas, ${actualizadas} actualizadas).`
+    ok.value = `Se importaron o actualizaron ${totalEstudiantes} estudiantes (${creadas} instituciones nuevas, ${actualizadas} actualizadas). Si las instituciones ya existían, ahora están activas y visibles en el formulario público.`
     await cargarInstituciones()
     await cargarEstudiantes()
   } catch {
@@ -252,6 +276,47 @@ const paginas = () => Math.max(1, Math.ceil(total.value / TAM))
         </div>
       </div>
       <button type="button" class="btn-primary" @click="agregar">Agregar</button>
+    </div>
+
+    <div class="card mb-6 bg-blue-50 border-blue-200">
+      <h3 class="font-semibold text-blue-800 mb-2">Contratistas disponibles para importación</h3>
+      <p class="text-sm text-blue-700 mb-3">
+        Antes de importar estudiantes, verifica que los contratistas estén registrados. Solo los contratistas
+        marcados como "Contratista (variable)" pueden usarse en la plantilla Excel.
+      </p>
+      <div v-if="contratistasCargando" class="text-sm text-blue-600">Cargando contratistas...</div>
+      <div v-else-if="contratistas.length === 0" class="text-sm text-blue-600">
+        No hay contratistas registrados.
+        <router-link to="/admin/firmantes" class="underline font-medium">Ir a Firmantes para registrar</router-link>
+      </div>
+      <div v-else class="space-y-1">
+        <div
+          v-for="c in contratistas.filter((c) => !c.es_fijo)"
+          :key="c.id"
+          class="text-sm bg-white px-3 py-1 rounded border border-blue-200 inline-block mr-2 mb-2"
+        >
+          <span class="font-medium">{{ c.nombre }}</span>
+          <span class="text-xs text-slate-500 ml-1">(contratista)</span>
+        </div>
+        <div v-if="contratistas.every((c) => c.es_fijo)" class="text-sm text-amber-700">
+          No hay contratistas variables. Todos los firmantes son fijos.
+          <router-link to="/admin/firmantes" class="underline font-medium">Agregar contratista</router-link>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-6 bg-amber-50 border-amber-200">
+      <h3 class="font-semibold text-amber-800 mb-2">⚠️ Importante: Visibilidad de instituciones</h3>
+      <p class="text-sm text-amber-700 mb-2">
+        Las instituciones se activan automáticamente al importar estudiantes. Solo las instituciones activas
+        aparecen en el formulario público para descargar certificados.
+      </p>
+      <p class="text-sm text-amber-700">
+        Si las instituciones no aparecen en la página pública, ve a
+        <router-link to="/admin/instituciones" class="underline font-medium">Instituciones</router-link>
+        y verifica que estén marcadas como "Activa". Puedes usar el botón "Activar todas" para activarlas
+        en masa.
+      </p>
     </div>
 
     <div class="card mb-6">
