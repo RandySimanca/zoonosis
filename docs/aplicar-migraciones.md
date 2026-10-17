@@ -11,6 +11,13 @@ Could not find the function public.listar_instituciones_activas without paramete
 
 Significa que **las migraciones no se han aplicado en Supabase producción**. La base de datos de producción está vacía o incompleta.
 
+Si ves el error:
+```
+ERROR: 42P07: relation "instituciones" already exists
+```
+
+Significa que las tablas ya existen pero las migraciones están parciales. Ve a [Resolver Migraciones Parciales](./resolver-migraciones-parciales.md).
+
 ## 📋 Pasos para Solucionar
 
 ### Paso 1: Obtener el Project Reference
