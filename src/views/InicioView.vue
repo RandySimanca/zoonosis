@@ -25,13 +25,30 @@ const turnstile = ref<{ reset: () => void } | null>(null)
 const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''
 
 onMounted(async () => {
-  const { data, error } = await supabase.rpc('listar_instituciones_activas')
-  cargandoLista.value = false
-  if (error) {
-    errorLista.value = 'No se pudieron cargar las instituciones. Intenta recargar la página.'
-    return
+  try {
+    console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL)
+    console.log('Iniciando carga de instituciones...')
+
+    const { data, error } = await supabase.rpc('listar_instituciones_activas')
+    cargandoLista.value = false
+
+    if (error) {
+      console.error('Error cargando instituciones:', error)
+      errorLista.value = `No se pudieron cargar las instituciones. Error: ${error.message}.`
+      return
+    }
+
+    instituciones.value = data ?? []
+    console.log('Instituciones cargadas:', instituciones.value.length, instituciones.value)
+
+    if (instituciones.value.length === 0) {
+      errorLista.value = 'No hay instituciones activas disponibles. Contacta al administrador.'
+    }
+  } catch (e) {
+    console.error('Error inesperado cargando instituciones:', e)
+    cargandoLista.value = false
+    errorLista.value = 'Error inesperado al cargar instituciones. Contacta al administrador.'
   }
-  instituciones.value = data ?? []
 })
 
 async function descargar(): Promise<void> {
