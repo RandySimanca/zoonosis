@@ -39,6 +39,7 @@ export interface FirmanteData {
 export interface CertificadoOpts {
   estudiante: {
     nombre_completo: string
+    tipo_documento: string
     numero_documento: string
   }
   institucion: {
@@ -102,6 +103,8 @@ export async function generarCertificadoPDF(opts: CertificadoOpts): Promise<Uint
   dibujarTitulo(page, fonts)
   dibujarCuerpo(page, fonts, {
     nombreEstudiante: estudiante.nombre_completo,
+    tipoDocumento: estudiante.tipo_documento,
+    numeroDocumento: estudiante.numero_documento,
     nombreInstitucion: institucion.nombre,
     municipio: institucion.municipio,
     dia, mes, anio: String(anio),
@@ -236,8 +239,19 @@ function dibujarTitulo(page: PDFPage, fonts: Fonts): void {
 
 // ── Cuerpo ───────────────────────────────────────────────────────────────
 
+const NOMBRES_TIPO_DOC: Record<string, string> = {
+  RC:  "Registro Civil",
+  TI:  "Tarjeta de Identidad",
+  CC:  "Cédula de Ciudadanía",
+  CE:  "Cédula de Extranjería",
+  PPT: "Permiso por Protección Temporal",
+  PEP: "Permiso Especial de Permanencia",
+}
+
 interface CuerpoData {
   nombreEstudiante: string
+  tipoDocumento: string
+  numeroDocumento: string
   nombreInstitucion: string
   municipio: string
   dia: number
@@ -247,7 +261,7 @@ interface CuerpoData {
 
 function dibujarCuerpo(page: PDFPage, fonts: Fonts, data: CuerpoData): void {
   const { cuerpo } = LAYOUT
-  const { nombreEstudiante, nombreInstitucion, municipio, dia, mes, anio } = data
+  const { nombreEstudiante, tipoDocumento, numeroDocumento, nombreInstitucion, municipio, dia, mes, anio } = data
 
   // "La Secretaría de Salud..."
   textoCentrado(
@@ -288,6 +302,19 @@ function dibujarCuerpo(page: PDFPage, fonts: Fonts, data: CuerpoData): void {
     end:   { x: CENTER_X + subrayW / 2, y: cuerpo.nombreEstudiante.y - 4 },
     thickness: 0.8, color: C.azul, opacity: 0.3,
   })
+
+  // Tipo y número de documento debajo del nombre
+  const tipoNombre = NOMBRES_TIPO_DOC[tipoDocumento] ?? tipoDocumento
+  textoCentrado(
+    page,
+    `${tipoNombre} No. ${numeroDocumento}`,
+    cuerpo.documentoEstudiante.y,
+    {
+      font: fonts.regular, size: cuerpo.documentoEstudiante.fontSize,
+      sizeMin: cuerpo.documentoEstudiante.fontSizeMin,
+      color: C.negro, maxWidth: TEXT_WIDTH,
+    }
+  )
 
   // "de la Institución Educativa..."
   textoCentrado(

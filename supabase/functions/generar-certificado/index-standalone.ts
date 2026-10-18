@@ -118,7 +118,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { institucion_id, tipo_documento, numero_documento, captcha_token } = body
 
-    if (!institucion_id || !tipo_documento || !numero_documento || !captcha_token) {
+    if (!tipo_documento || !numero_documento || !captcha_token) {
       return jsonError(400, "Todos los campos son requeridos")
     }
 
@@ -156,19 +156,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(429, "Demasiados intentos. Espera unos minutos e intenta de nuevo.")
     }
 
-    // 7. Buscar estudiante en esa institución específica
+    // 7. Buscar estudiante por tipo + número (único global) con su jornada
     const { data: estudiante, error: errEst } = await supabase
       .from("estudiantes")
-      .select("id, nombre_completo, tipo_documento, numero_documento, institucion_id")
-      .eq("institucion_id", institucion_id)
+      .select(`
+        id, nombre_completo, tipo_documento, numero_documento, aprobado,
+        jornada:jornadas!jornada_id (
+          id, activa, fecha_expedicion, institucion_id,
+          institucion:instituciones!institucion_id ( id, nombre, municipio, activa ),
+          contratista:firmantes!contratista_id ( id, nombre, cargo, firma_path )
+        )
+      `)
       .eq("tipo_documento", tipo_documento)
       .eq("numero_documento", numeroNorm)
       .maybeSingle()
 
-    console.log("📊 Resultado búsqueda:", {
-      estudiante,
-      error: errEst,
-    })
+    console.log("📊 Resultado búsqueda:", { estudiante, error: errEst })
 
     if (errEst) {
       console.error("Error al buscar estudiante:", errEst)
@@ -176,33 +179,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(500, "Ocurrió un error. Intenta nuevamente más tarde.")
     }
 
-    if (!estudiante) {
-      console.warn("⚠️ Estudiante no encontrado con:", {
-        institucion_id,
-        tipo_documento,
-        numeroNorm,
+    const jornada = (estudiante as any)?.jornada
+    const institucion = jornada?.institucion
+    const contratista = jornada?.contratista
+
+    // institucion_id es opcional: si llega, debe coincidir con la jornada del estudiante
+    const coincideInst = !institucion_id || jornada?.institucion_id === institucion_id
+
+    if (!estudiante || !estudiante.aprobado || !jornada?.activa || !institucion?.activa || !coincideInst) {
+      console.warn("⚠️ Sin certificado:", {
+        encontrado: !!estudiante, aprobado: estudiante?.aprobado,
+        jornadaActiva: jornada?.activa, institucionActiva: institucion?.activa, coincideInst,
       })
       await registrarIntento(supabase, ipHash, false)
       return jsonError(404, MSG_NO_ENCONTRADO)
     }
 
-    // 8. Obtener institución (con su contratista) y los 2 firmantes fijos
-    const { data: institucion, error: errInst } = await supabase
-      .from("instituciones")
-      .select(`
-        id, nombre, municipio, fecha_expedicion,
-        contratista:firmantes!contratista_id ( id, nombre, cargo, firma_path )
-      `)
-      .eq("id", institucion_id)
-      .eq("activa", true)
-      .single()
-
-    if (errInst || !institucion) {
-      await registrarIntento(supabase, ipHash, false)
-      return jsonError(404, MSG_NO_ENCONTRADO)
-    }
-
-    // Firmantes fijos (puestos 1 y 2): iguales en todos los certificados
+    // 8. Firmantes fijos (puestos 1 y 2): iguales en todos los certificados
     const { data: fijos, error: errFijos } = await supabase
       .from("firmantes")
       .select("id, nombre, cargo, firma_path")
@@ -215,8 +208,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonError(500, "Ocurrió un error. Intenta nuevamente más tarde.")
     }
 
-    // Orden de firma: fijo 1, fijo 2, contratista de la institución (derecha)
-    const firmantes = [...(fijos ?? []), institucion.contratista as any].filter(Boolean)
+    // Orden de firma: fijo 1, fijo 2, contratista de la jornada (derecha)
+    const firmantes = [...(fijos ?? []), contratista as any].filter(Boolean)
 
     // 9. Descargar imágenes de firma desde Storage (privado)
     const firmasImagenes = await descargarFirmas(supabase, firmantes)
@@ -225,12 +218,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const pdfBytes = await generarCertificadoPDF({
       estudiante: {
         nombre_completo: estudiante.nombre_completo,
+        tipo_documento: estudiante.tipo_documento,
         numero_documento: estudiante.numero_documento,
       },
       institucion: {
         nombre:           institucion.nombre,
         municipio:        institucion.municipio,
-        fecha_expedicion: institucion.fecha_expedicion,
+        fecha_expedicion: jornada.fecha_expedicion,
       },
       firmantes,
       firmasImagenes,

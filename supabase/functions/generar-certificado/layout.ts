@@ -93,6 +93,9 @@ export const LAYOUT = {
       fontSizeMin: 12,
     },
 
+    // Tipo y número de documento, justo debajo del nombre
+    documentoEstudiante: { y: 350, fontSize: 11, fontSizeMin: 8 },
+
     deInstitucion: { y: 337, fontSize: 10, fontSizeMin: 8 },
     participo:     { y: 318, fontSize: 10 },
     estrategia:    { y: 300, fontSize: 11 },
