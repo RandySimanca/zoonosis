@@ -58,13 +58,13 @@ interface Fonts {
 
 // ── Colores pre-instanciados ─────────────────────────────────────────────
 const C = {
-  azul:    rgb(COLORES.azul.r,    COLORES.azul.g,    COLORES.azul.b),
-  teal:    rgb(COLORES.teal.r,    COLORES.teal.g,    COLORES.teal.b),
-  dorado:  rgb(COLORES.dorado.r,  COLORES.dorado.g,  COLORES.dorado.b),
-  blanco:  rgb(COLORES.blanco.r,  COLORES.blanco.g,  COLORES.blanco.b),
-  negro:   rgb(COLORES.negro.r,   COLORES.negro.g,   COLORES.negro.b),
-  gris:    rgb(COLORES.gris.r,    COLORES.gris.g,    COLORES.gris.b),
-  fondo:   rgb(COLORES.fondo.r,   COLORES.fondo.g,   COLORES.fondo.b),
+  azul: rgb(COLORES.azul.r, COLORES.azul.g, COLORES.azul.b),
+  teal: rgb(COLORES.teal.r, COLORES.teal.g, COLORES.teal.b),
+  dorado: rgb(COLORES.dorado.r, COLORES.dorado.g, COLORES.dorado.b),
+  blanco: rgb(COLORES.blanco.r, COLORES.blanco.g, COLORES.blanco.b),
+  negro: rgb(COLORES.negro.r, COLORES.negro.g, COLORES.negro.b),
+  gris: rgb(COLORES.gris.r, COLORES.gris.g, COLORES.gris.b),
+  fondo: rgb(COLORES.fondo.r, COLORES.fondo.g, COLORES.fondo.b),
   azulPale: rgb(COLORES.azulPale.r, COLORES.azulPale.g, COLORES.azulPale.b),
 }
 
@@ -84,8 +84,8 @@ export async function generarCertificadoPDF(opts: CertificadoOpts): Promise<Uint
 
   // Parsear fecha de expedición (forzar mediodía UTC para evitar desfase)
   const fechaObj = new Date(`${institucion.fecha_expedicion}T12:00:00Z`)
-  const dia  = fechaObj.getUTCDate()
-  const mes  = MESES_ES[fechaObj.getUTCMonth()]
+  const dia = fechaObj.getUTCDate()
+  const mes = MESES_ES[fechaObj.getUTCMonth()]
   const anio = fechaObj.getUTCFullYear()
 
   // ── Crear documento ──────────────────────────────────────────
@@ -129,15 +129,15 @@ async function cargarFuentes(doc: PDFDocument): Promise<Fonts> {
       }),
     ])
     return {
-      regular: await doc.embedFont(bytesReg),
-      bold:    await doc.embedFont(bytesBold),
+      regular: await doc.embedFont(bytesReg, { subset: true }),
+      bold: await doc.embedFont(bytesBold, { subset: true }),
     }
   } catch (err) {
     // Fallback: Helvetica soporta WinAnsiEncoding (incluye tildes y ñ)
     console.warn("Fuente personalizada no disponible, usando Helvetica:", err)
     return {
       regular: await doc.embedFont(StandardFonts.Helvetica),
-      bold:    await doc.embedFont(StandardFonts.HelveticaBold),
+      bold: await doc.embedFont(StandardFonts.HelveticaBold),
     }
   }
 }
@@ -232,7 +232,7 @@ function dibujarTitulo(page: PDFPage, fonts: Fonts): void {
   const lineaW = TEXT_WIDTH * 0.55
   page.drawLine({
     start: { x: CENTER_X - lineaW / 2, y: titulo.y - 7 },
-    end:   { x: CENTER_X + lineaW / 2, y: titulo.y - 7 },
+    end: { x: CENTER_X + lineaW / 2, y: titulo.y - 7 },
     thickness: 0.7, color: C.teal, opacity: 0.4,
   })
 }
@@ -240,10 +240,10 @@ function dibujarTitulo(page: PDFPage, fonts: Fonts): void {
 // ── Cuerpo ───────────────────────────────────────────────────────────────
 
 const NOMBRES_TIPO_DOC: Record<string, string> = {
-  RC:  "Registro Civil",
-  TI:  "Tarjeta de Identidad",
-  CC:  "Cédula de Ciudadanía",
-  CE:  "Cédula de Extranjería",
+  RC: "Registro Civil",
+  TI: "Tarjeta de Identidad",
+  CC: "Cédula de Ciudadanía",
+  CE: "Cédula de Extranjería",
   PPT: "Permiso por Protección Temporal",
   PEP: "Permiso Especial de Permanencia",
 }
@@ -299,7 +299,7 @@ function dibujarCuerpo(page: PDFPage, fonts: Fonts, data: CuerpoData): void {
   const subrayW = Math.min(nombreAncho + 16, TEXT_WIDTH)
   page.drawLine({
     start: { x: CENTER_X - subrayW / 2, y: cuerpo.nombreEstudiante.y - 4 },
-    end:   { x: CENTER_X + subrayW / 2, y: cuerpo.nombreEstudiante.y - 4 },
+    end: { x: CENTER_X + subrayW / 2, y: cuerpo.nombreEstudiante.y - 4 },
     thickness: 0.8, color: C.azul, opacity: 0.3,
   })
 
@@ -383,13 +383,13 @@ async function dibujarFirmas(
   // Línea separadora horizontal
   page.drawLine({
     start: { x: MARGIN_H, y: firmas.separadorY },
-    end:   { x: PAGE_WIDTH - MARGIN_H, y: firmas.separadorY },
+    end: { x: PAGE_WIDTH - MARGIN_H, y: firmas.separadorY },
     thickness: 0.5, color: C.azul, opacity: 0.3,
   })
 
   for (let i = 0; i < Math.min(firmantes.length, 3); i++) {
-    const f   = firmantes[i]
-    const cx  = firmas.cols[i]
+    const f = firmantes[i]
+    const cx = firmas.cols[i]
     const imgX = cx - firmas.imagenW / 2
 
     // Imagen de firma o línea de placeholder
@@ -440,7 +440,7 @@ async function dibujarFirmas(
 function dibujarLineaFirma(page: PDFPage, cx: number, y: number, w: number): void {
   page.drawLine({
     start: { x: cx - w / 2, y },
-    end:   { x: cx + w / 2, y },
+    end: { x: cx + w / 2, y },
     thickness: 0.8, color: C.azul, opacity: 0.5,
   })
 }
