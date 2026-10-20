@@ -856,7 +856,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // 12. Entregar PDF
     const nombreArchivo = `Certificado_${numeroNorm}.pdf`
-    return new Response(pdfBytes, {
+    return new Response(pdfBytes as unknown as BodyInit, {
       status: 200,
       headers: {
         ...corsHeaders,
