@@ -55,6 +55,14 @@ export const LAYOUT = {
     marcoGrosor: 1.5,
   },
 
+  // ── Logos en las esquinas del encabezado (medidas del certificado de ejemplo)
+  // x = borde izquierdo; yTop = distancia desde el borde SUPERIOR de la página
+  logos: {
+    padding: 3,   // marco blanco alrededor del logo (sobre la banda azul)
+    gobernacion: { x: 50, yTop: 14.7, w: 102.2, h: 41.2 },  // izquierda
+    etv: { x: 690.5, yTop: 28.3, w: 84.8, h: 32.3 },  // derecha
+  },
+
   // ── Encabezado (texto sobre la banda azul) ────────────────────
   encabezado: {
     gobernacion: {

@@ -27,6 +27,7 @@ import {
   COLORES,
   FONT_URLS,
 } from "./layout.ts"
+import { LOGO_GOBERNACION_B64, LOGO_ETV_B64 } from "./logos.ts"
 
 // ── Tipos ────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ export async function generarCertificadoPDF(opts: CertificadoOpts): Promise<Uint
   // ── Dibujar en orden (de atrás hacia adelante) ───────────────
   dibujarFondo(page)
   dibujarEncabezado(page, fonts)
+  await dibujarLogos(page, doc)
   dibujarTitulo(page, fonts)
   dibujarCuerpo(page, fonts, {
     nombreEstudiante: estudiante.nombre_completo,
@@ -112,6 +114,42 @@ export async function generarCertificadoPDF(opts: CertificadoOpts): Promise<Uint
   await dibujarFirmas(page, doc, fonts, firmantes, firmasImagenes)
 
   return await doc.save()
+}
+
+// ── Logos ────────────────────────────────────────────────────────────────
+
+function base64ABytes(b64: string): Uint8Array {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
+/** Dibuja los logos de la Gobernación (izquierda) y ETV y Zoonosis (derecha). */
+async function dibujarLogos(page: PDFPage, doc: PDFDocument): Promise<void> {
+  const { logos } = LAYOUT
+  const items = [
+    { b64: LOGO_GOBERNACION_B64, pos: logos.gobernacion },
+    { b64: LOGO_ETV_B64, pos: logos.etv },
+  ]
+
+  for (const { b64, pos } of items) {
+    try {
+      const img = await doc.embedPng(base64ABytes(b64))
+      const y = PAGE_HEIGHT - pos.yTop - pos.h
+      const pad = logos.padding
+      // Fondo blanco para que el logo se lea sobre la banda azul
+      page.drawRectangle({
+        x: pos.x - pad, y: y - pad,
+        width: pos.w + pad * 2, height: pos.h + pad * 2,
+        color: C.blanco,
+      })
+      page.drawImage(img, { x: pos.x, y, width: pos.w, height: pos.h })
+    } catch (e) {
+      // Un logo que falle no debe impedir la descarga del certificado
+      console.error("No se pudo dibujar un logo:", e)
+    }
+  }
 }
 
 // ── Fuentes ──────────────────────────────────────────────────────────────
